@@ -13,38 +13,50 @@ public actor DownloadScheduler {
     private var waitingQueue: [DownloadCandidate] = []
     
     public init(maxConcurrentDownloads: Int,
-         schedulerPolicy: any SchedulingPolicy) {
+            schedulerPolicy: any SchedulingPolicy) {
         self.maxConcurrentDownloads = maxConcurrentDownloads
         self.schedulerPolicy = schedulerPolicy
     }
     
-    public func enqueue(_ candidate: DownloadCandidate) {
-        if !reservedDownloads.contains(candidate.id) &&
-            !waitingQueue.contains(where: { $0.id == candidate.id } ) {
-            waitingQueue.append(candidate)
+    public func enqueue(_ candidates: [DownloadCandidate]) -> [DownloadCandidate] {
+        for candidate in candidates {
+            if !reservedDownloads.contains(candidate.id) &&
+                !waitingQueue.contains(where: { $0.id == candidate.id } ) {
+                waitingQueue.append(candidate)
+            }
         }
+        return scheduleAll()
     }
     
-    public func scheduleNext() ->  DownloadCandidate? {
+    public func release(_ id: Int) {
+        reservedDownloads.remove(id)
+    }
+
+    public func queuedDownloadIds() -> [Int] {
+        return waitingQueue.map { $0.id }
+    }
+
+    private func scheduleAll() -> [DownloadCandidate] {
+        var candidates = [DownloadCandidate]()
+        while let candidate = scheduleNext() {
+            candidates.append(candidate)
+        }
+        return candidates
+    }
+
+    private func scheduleNext() ->  DownloadCandidate? {
         guard let candidate = schedulerPolicy.selectNext(from: waitingQueue),
               tryReserve(candidate.id) else { return nil }
         waitingQueue.removeAll(where: {$0.id == candidate.id})
         return candidate
     }
     
-    func tryReserve(_ id: Int) -> Bool {
+    private func tryReserve(_ id: Int) -> Bool {
         guard reservedDownloads.count < maxConcurrentDownloads &&
                 !reservedDownloads.contains(id) else { return false }
         reservedDownloads.insert(id)
         return true
     }
     
-    func release(_ id: Int) {
-        reservedDownloads.remove(id)
-    }
-    
-    public func queuedDownloadIds() -> [Int] {
-        return waitingQueue.map { $0.id }
-    }
 }
 
