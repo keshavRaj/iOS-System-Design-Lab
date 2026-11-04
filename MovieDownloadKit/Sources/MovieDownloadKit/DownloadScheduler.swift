@@ -28,8 +28,12 @@ public actor DownloadScheduler {
         return scheduleAll()
     }
     
-    public func release(_ id: Int) {
-        reservedDownloads.remove(id)
+    public func release(_ id: Int) -> [DownloadCandidate] {
+        if let _ = reservedDownloads.remove(id) {
+            return scheduleAll()
+        } else {
+            return []
+        }
     }
 
     public func queuedDownloadIds() -> [Int] {

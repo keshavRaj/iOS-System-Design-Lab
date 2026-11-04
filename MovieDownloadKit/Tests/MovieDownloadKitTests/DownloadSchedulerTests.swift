@@ -49,6 +49,35 @@ final class DownloadSchedulerTests: XCTestCase {
         XCTAssertEqual([1,5], queuedAfterDuplicate)
     }
 
+    func test_release_schedulesNextCandidateAsPolicy() async {
+        _ = await sut.enqueue(downloadCandidates)
+        let newlyScheduled = await sut.release(3)
+        let newlyScheduledId = newlyScheduled.map { $0.id }
+        let queuedIdsAfterRelease = await sut.queuedDownloadIds()
+
+        XCTAssertEqual([1], newlyScheduledId)
+        XCTAssertEqual([5], queuedIdsAfterRelease)
+    }
+
+    func test_release_unavailableReservedId_doesNotSchedule() async {
+        _ = await sut.enqueue(downloadCandidates)
+        let newlyScheduled = await sut.release(10)
+        let queuedIdsAfterRelease = await sut.queuedDownloadIds()
+
+        XCTAssertEqual(0, newlyScheduled.count)
+        XCTAssertEqual([1,5], queuedIdsAfterRelease)
+    }
+
+    func test_release_alreadyReleasedId_doesNotScheduleAgain() async {
+        _ = await sut.enqueue(downloadCandidates)
+        _ = await sut.release(3)
+        let duplicateReleaseScheduled = await sut.release(3)
+        let queuedAfterDuplicateRelease = await sut.queuedDownloadIds()
+
+        XCTAssertEqual(0, duplicateReleaseScheduled.count)
+        XCTAssertEqual([5], queuedAfterDuplicateRelease)
+    }
+
     override func tearDown() {
         super.tearDown()
         sut = nil
